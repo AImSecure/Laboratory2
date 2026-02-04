@@ -3,4 +3,17 @@
 % Section Title
 \section{INTRODUCTION} \label{sec:introduction}
 
-    % text
+    Dynamic malware analysis leverages runtime behavior to detect malicious software, circumventing the limitations of static signature-based methods against obfuscated or polymorphic variants. API call sequences---the ordered invocations a program makes to the operating system---provide a rich behavioral fingerprint, capturing memory operations, registry accesses, and system queries that reveal malicious intent.
+
+    This laboratory implements a comparative study of neural network architectures for binary malware classification based on API call sequences. The dataset consists of execution traces, each represented as a variable-length sequence of API function names (e.g., \cooltext{NtAllocateVirtualMemory}, \cooltext{RegOpenKeyExW}).
+
+    We evaluate four progressively complex approaches:
+
+    \begin{itemize}
+        \item \textbf{1:} Implement and evaluate a frequency-based logistic regression baseline.
+        \item \textbf{2:} Develop Feed-Forward Neural Networks with different input representations.
+        \item \textbf{3:} Explore Recurrent Neural Network architectures for sequential modeling.
+        \item \textbf{4:} Construct Graph Neural Networks to leverage structural information in API call sequences.
+    \end{itemize}
+
+    The following sections detail the methodology and results for each task, analyzing how architectural choices impact classification performance.

@@ -1,0 +1,161 @@
+% task2.tex
+
+% Section Title
+\section{TASK 2: FEED FORWARD NEURAL NETWORK (FFNN)} \label{sec:task2}
+   
+The Feed-Forward Neural Network represents the first neural architecture applied to the malware detection task and serves as a controlled transition from feature-based baselines to representation learning. Its adoption immediately exposes two structural constraints of FFNNs: the requirement of fixed-size inputs and the inability to explicitly model temporal dependencies. The entire design of this task is therefore shaped by the need to adapt sequential, variable-length, categorical data to a static vector-based model.
+
+\subsection{Sequence Length Variability and Fixed-Size Encoding}
+
+API call sequences are inherently variable in length. A preliminary statistical analysis shows that neither the training nor the test set exhibits uniform sequence sizes. Moreover, the two distributions are not aligned: test sequences are, on average, longer and shifted toward higher values. This mismatch is illustrated in Figure~\ref{fig:seq_length_distribution}.
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=0.50\linewidth]{\imagespath Task2/distribution_sequence_lengths_train_test.png}
+    \caption{Distribution of API call sequence lengths in training and test sets.}
+    \label{fig:seq_length_distribution}
+\end{figure}
+
+Since an FFNN operates on fixed-dimensional vectors, each sequence must be transformed to a common length. The target size was estimated exclusively on the training set to avoid information leakage. Among the evaluated candidates, the maximum observed training length was selected, ensuring that no training information was discarded. Sequences shorter than this threshold were padded using a dedicated token, while longer sequences were truncated at the tail. The same transformation was applied to the test set to preserve dimensional consistency at inference time.
+
+This operation enforces a uniform representation but introduces an unavoidable trade-off: padding increases input sparsity, while truncation removes potentially informative late-stage API calls. These limitations are intrinsic to FFNN-based modeling of sequences and motivate the comparison with more expressive architectures in later tasks.
+
+\subsection{Categorical Representation of API Calls}
+
+API calls are symbolic entities and must be mapped to a numerical space. A unified vocabulary was built from the padded training sequences, augmented with two special symbols: a padding token and an unknown token, the latter used to handle API calls appearing only in the test set.
+
+Two alternative encoding strategies were considered.
+
+\paragraph{Sequential Identifiers.}
+Each API call is mapped to an integer identifier. This approach is simple and compact but introduces no semantic structure: numerical proximity between identifiers is arbitrary and does not reflect behavioral similarity. The FFNN must therefore infer all relationships implicitly from co-occurrence patterns across fixed positions.
+
+\paragraph{Learnable Embeddings.}
+In the second configuration, integer identifiers are projected into a dense vector space through a learnable embedding layer. This mapping is optimized jointly with the classifier and allows the model to encode latent similarities between API calls that frequently appear in related contexts. Compared to raw identifiers, embeddings provide a smoother and more expressive input space, at the cost of additional parameters.
+
+\subsection{FFNN Architecture}
+
+The FFNN architecture consists of an optional embedding layer followed by a stack of fully connected layers with decreasing width. ReLU activations are used throughout, with batch normalization and dropout applied to stabilize training and reduce overfitting. When embeddings are enabled, the embedded sequence is flattened into a single vector before being processed by the feed-forward layers. The output layer produces a single logit for binary classification.
+
+\subsection{Learning Rate Sensitivity Analysis}
+
+To assess training stability and convergence behavior, multiple learning rates were evaluated for each architecture. Figure~\ref{fig:ffnn_lr_comparison} compares training and validation loss curves across learning rates for the sequential identifier configuration.
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=0.9\linewidth]{\imagespath Task2/ffnn_sequential_ids_lr_comparison.png}
+    \caption{Training and validation loss curves for the FFNN with sequential identifiers under different learning rates.}
+    \label{fig:ffnn_lr_comparison}
+\end{figure}
+
+Higher learning rates accelerate early convergence but lead to noisier validation curves and less stable plateaus. Lower learning rates produce smoother trajectories but require more epochs to reach comparable performance. An intermediate value yields the best trade-off between convergence speed and stability, minimizing validation loss without oscillatory behavior.
+
+A complementary view is provided in Figure~\ref{fig:ffnn_overfitting_diagnosis}, where training and validation losses are shown side by side for each learning rate.
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=\linewidth]{\imagespath Task2/ffnn_sequential_ids_diagnosis.png}
+    \caption{Train vs.\ validation loss for different learning rates, highlighting overfitting and underfitting regimes.}
+    \label{fig:ffnn_overfitting_diagnosis}
+\end{figure}
+
+These plots reveal that excessively large learning rates push the model toward premature convergence with limited generalization, while excessively small values slow optimization without clear performance gains. The selected configuration corresponds to the lowest validation loss with consistent train–validation alignment.
+
+\subsection{Confusion Matrix Analysis}
+
+To complement scalar metrics, confusion matrices were analyzed on the test set. Figure~\ref{fig:ffnn_cm_seq} reports the confusion matrix for the best-performing FFNN using sequential identifiers.
+
+\begin{figure}[H]
+            \centering
+            \begin{minipage}{0.33\textwidth}
+                \centering
+                \includegraphics[width=\linewidth]{\imagespath Task2/cm_ffnn_sequential_ids_(lr=1e_04).png}
+                \caption{Learning rate = 1e-4}
+                \label{fig:ffnn_seq_cm_lr_1e4}
+            \end{minipage}
+            \hfill
+            \begin{minipage}{0.33\textwidth}
+                \centering
+                \includegraphics[width=\linewidth]{\imagespath Task2/cm_ffnn_sequential_ids_(lr=1e_05).png}
+                \caption{Learning rate = 1e-5}
+                \label{fig:ffnn_seq_cm_lr_1e5}
+            \end{minipage}
+            \begin{minipage}{0.33\textwidth}
+                \centering
+                \includegraphics[width=\linewidth]{\imagespath Task2/cm_ffnn_sequential_ids_(lr=5e_05).png}
+                \caption{Learning rate = 5e-5}
+                \label{fig:ffnn_seq_cm_lr_5e5}
+            \end{minipage}
+            \label{fig:ffnn_cm_seq}
+        \end{figure}
+
+The matrix highlights a strong bias toward the majority class. While malware samples are detected with high recall, benign samples are frequently misclassified. This behavior is consistent with the class imbalance of the dataset and confirms that overall accuracy alone is not a sufficient indicator of model quality. The FFNN effectively learns dominant patterns but struggles to establish robust decision boundaries for the minority class.
+
+\subsection{Learnable Embeddings: Architecture and Training Behavior}
+
+In parallel with the sequential identifiers configuration, the FFNN was trained using a learnable embedding layer as the first stage of the model. In this setting, each API call identifier is projected into a dense, low-dimensional vector space before being processed by the fully connected layers. The embedding matrix is optimized jointly with the classifier, allowing the model to learn distributed representations that capture latent similarities between API calls.
+
+From an architectural standpoint, the introduction of embeddings changes the effective input geometry of the network. Instead of operating directly on discrete identifiers, the FFNN receives a continuous representation in which semantically related API calls can occupy nearby regions of the embedding space. After embedding, the sequence is flattened, preserving positional information but enriching each position with a learned feature vector rather than a scalar identifier.
+
+\subsection{Learning Rate Analysis for the Embedding-Based Model}
+
+As with the sequential identifiers approach, multiple learning rates were evaluated to assess optimization stability and convergence dynamics. Figure~\ref{fig:ffnn_emb_lr_comparison} reports the training and validation loss curves for the embedding-based FFNN under different learning rate values.
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=0.9\linewidth]{\imagespath Task2/ffnn_learnable_embeddings_lr_comparison.png}
+    \caption{Training and validation loss curves for the FFNN with learnable embeddings under different learning rates.}
+    \label{fig:ffnn_emb_lr_comparison}
+\end{figure}
+
+Compared to the sequential identifiers model, the embedding-based architecture exhibits smoother optimization trajectories and reduced sensitivity to the learning rate choice. Larger learning rates still accelerate early convergence, but oscillations in validation loss are attenuated, suggesting that the continuous embedding space stabilizes gradient updates. Lower learning rates converge more slowly but remain consistently aligned between training and validation losses.
+
+A more detailed diagnosis is shown in Figure~\ref{fig:ffnn_emb_overfitting}, where training and validation losses are displayed jointly for each learning rate.
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=\linewidth]{\imagespath Task2/ffnn_learnable_embeddings_diagnosis.png}
+    \caption{Train vs.\ validation loss for the embedding-based FFNN, highlighting convergence behavior across learning rates.}
+    \label{fig:ffnn_emb_overfitting}
+\end{figure}
+
+Across all tested configurations, the embedding-based model shows reduced overfitting tendencies compared to the sequential identifiers variant. The gap between training and validation loss remains narrower, particularly in later epochs, indicating improved generalization.
+
+\subsection{Confusion Matrix Analysis: Embeddings vs.\ Sequential Identifiers}
+
+The impact of embeddings is further clarified through confusion matrix analysis. Figure~\ref{fig:ffnn_cm_emb_lr} reports the confusion matrices obtained for the embedding-based FFNN under different learning rates.
+
+\begin{figure}[H]
+    \centering
+    \begin{minipage}{0.33\textwidth}
+        \centering
+        \includegraphics[width=\linewidth]{\imagespath Task2/cm_ffnn_learnable_embeddings_(lr=1e_05).png}
+        \caption{Learning rate = 1e-5}
+        \label{fig:ffnn_emb_cm_lr_1e5}
+    \end{minipage}
+    \hfill
+    \begin{minipage}{0.33\textwidth}
+        \centering
+        \includegraphics[width=\linewidth]{\imagespath Task2/cm_ffnn_learnable_embeddings_(lr=5e_05).png}
+        \caption{Learning rate = 5e-5}
+        \label{fig:ffnn_emb_cm_lr_5e5}
+    \end{minipage}
+    \begin{minipage}{0.33\textwidth}
+        \centering
+        \includegraphics[width=\linewidth]{\imagespath Task2/cm_ffnn_learnable_embeddings_(lr=5e_06).png}
+        \caption{Learning rate = 5e-6}
+        \label{fig:ffnn_emb_cm_lr_5e6}
+    \end{minipage}
+    \label{fig:ffnn_cm_emb_lr}
+\end{figure}
+
+Relative to the sequential identifiers model, embeddings reduce the asymmetry between classes. While the dataset remains heavily imbalanced and the majority class still dominates predictions, the embedding-based FFNN consistently improves recall and precision for the minority class. This effect is particularly visible in the reduction of false negatives for benign samples, indicating that the model benefits from a more expressive input representation.
+
+\subsection{Comparative Discussion}
+
+The comparison between sequential identifiers and learnable embeddings highlights a clear qualitative difference in how the FFNN internalizes API call information. Sequential identifiers force the network to treat API calls as isolated symbols whose relationships must be inferred indirectly through position-specific patterns. This results in brittle decision boundaries and strong bias toward the majority class, as evidenced by the confusion matrices and macro-averaged metrics.
+
+In contrast, learnable embeddings provide a structured, continuous representation that allows the model to capture similarities between API calls that frequently co-occur in related behaviors. This leads to more stable training dynamics, reduced sensitivity to hyperparameter choices, and improved generalization on the minority class, even though temporal structure is still flattened.
+
+Despite these improvements, both approaches share the same fundamental limitation: the sequential nature of API calls is encoded only implicitly through position, not through recurrence or state. The embedding-based FFNN therefore represents an incremental but meaningful step forward, setting a stronger baseline and justifying the transition to architectures that can explicitly model temporal dependencies in subsequent tasks.
+
+
