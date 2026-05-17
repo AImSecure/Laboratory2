@@ -80,14 +80,7 @@ The GCN model uses three \cooltext{GCNConv} layers followed by ReLU activations 
     \label{fig:task4_gat_curves}
 \end{figure}
 
-\begin{figure}[H]
-    \centering
-    \includegraphics[width=0.6\linewidth]{\imagespath Task4/task4_gnn_comparison_f1_macro.png}
-    \caption{Validation macro F1 comparison among the selected GNN architectures.}
-    \label{fig:task4_gnn_curves}
-\end{figure}
-
-The final configurations are selected using validation behavior, consistently with the previous tasks. For GCN, $lr=5\cdot10^{-4}$ is selected because it achieves the best validation-loss minimum among the tested configurations, with validation macro F1 0.7830 and test macro F1 0.7711. GraphSAGE also selects $lr=5\cdot10^{-4}$ under the same validation-loss criterion, reaching test macro F1 0.7633. Finally, GAT selects $lr=5\cdot10^{-4}$, obtaining validation macro F1 0.8079 and the best GNN test macro F1, 0.7903. The selected training times are approximately 179.62 seconds for GCN, 135.01 seconds for GraphSAGE, and 257.52 seconds for GAT.
+The final configurations are selected using validation behavior, consistently with the previous tasks. GCN and GraphSAGE both perform best with $lr=10^{-3}$, reaching validation macro F1 0.8027 and 0.8443, and test macro F1 0.7707 and 0.8147 respectively. GAT selects $lr=5\cdot10^{-4}$, with validation macro F1 0.8049 and test macro F1 0.7827. The selected training times are approximately 142 seconds for GCN, about 100 seconds for GraphSAGE, and 278.72 seconds for GAT.
 
 \subsection{Performance Analysis} \label{subsec:task4_results}
 
@@ -103,23 +96,21 @@ Table~\ref{tab:task4_performance} provides the final comparison across all selec
 \textbf{Model} & \textbf{Accuracy} & \multicolumn{2}{c}{\textbf{Benign (0)}} & \multicolumn{2}{c}{\textbf{Malware (1)}} & \textbf{Macro F1} \\
  & & Prec. & Rec. & Prec. & Rec. & \\
 \midrule
-GCN & 95.82\% & 0.4619 & 0.7243 & 0.9891 & 0.9673 & 0.7711 \\
-GraphSAGE & 95.10\% & 0.4191 & 0.8107 & 0.9924 & 0.9564 & 0.7633 \\
-GAT & 96.31\% & 0.5042 & 0.7407 & 0.9898 & 0.9717 & 0.7903 \\
+GCN & 95.90\% & 0.4674 & 0.7078 & 0.9884 & 0.9687 & 0.7707 \\
+GraphSAGE & 97.34\% & 0.6446 & 0.6420 & 0.9861 & 0.9863 & 0.8147 \\
+GAT & 95.85\% & 0.4672 & 0.7901 & 0.9916 & 0.9650 & 0.7827 \\
 \midrule
-Simple RNN & 95.34\% & 0.4257 & 0.7078 & 0.9884 & 0.9630 & 0.7536 \\
-Bi-RNN & 95.56\% & 0.4392 & 0.6831 & 0.9874 & 0.9661 & 0.7556 \\
-Bi-LSTM & 96.66\% & 0.5387 & 0.7449 & 0.9899 & 0.9752 & 0.8039 \\
+Simple RNN & 94.08\% & 0.3443 & 0.6461 & 0.9858 & 0.9523 & 0.7090 \\
+Bi-RNN & 94.20\% & 0.3649 & 0.7449 & 0.9897 & 0.9497 & 0.7296 \\
+Bi-LSTM & 96.65\% & 0.5392 & 0.7078 & 0.9885 & 0.9765 & 0.7973 \\
 \midrule
 Freq. baseline & 96.97\% & 0.6885 & 0.3457 & 0.9751 & 0.9939 & 0.7223 \\
-Seq. ID FFNN & 93.01\% & 0.1074 & 0.1193 & 0.9657 & 0.9615 & 0.5383 \\
-Embed. FFNN & 91.84\% & 0.1712 & 0.3086 & 0.9723 & 0.9420 & 0.5886 \\
+Seq. ID FFNN & 93.14\% & 0.1199 & 0.1317 & 0.9662 & 0.9625 & 0.5449 \\
+Embed. FFNN & 92.59\% & 0.1726 & 0.2593 & 0.9707 & 0.9518 & 0.5842 \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-Among the GNN models, GAT is the strongest overall, suggesting that attention helps assign different importance to neighboring API-call transitions. GCN is close behind, while GraphSAGE reaches the highest benign recall, 81.07\%, at the cost of lower benign precision. All three models keep excellent malware precision and recall, above 98.9\% and 95.6\% respectively.
+Among the selected GNN models, GraphSAGE is the strongest overall: its macro F1 0.8147 is the highest in the table because it balances benign precision and recall better than GCN and GAT. GAT still reaches the highest benign recall among the selected GNNs, but with lower benign precision; all graph models keep excellent malware precision and recall, above 98.6\% and 96.5\% respectively.
 
-The comparison with the baseline highlights the same trade-off already observed in Task 3. The frequency-based classifier reaches 96.97\% accuracy and 99.39\% malware recall, but only 34.57\% benign recall. GNNs sacrifice a small amount of accuracy while raising benign recall to the 72--81\% range, producing better macro F1 and a more balanced behavior.
-
-Compared with the recurrent models, the best GNN remains slightly below the Bi-LSTM in macro F1: GAT reaches 0.7903, while the Bi-LSTM reaches 0.8039. This suggests that strict temporal information is still useful, although graph models remain competitive by summarizing transition structure and clearly outperforming fixed-length FFNNs.
+Compared with the baseline, GraphSAGE slightly improves accuracy while strongly increasing macro F1, showing that transition structure improves balanced classification without sacrificing the majority-class behavior. It also surpasses the Bi-LSTM macro F1 of 0.7973, becoming the best model in this run. However, the lower benign recall of GraphSAGE compared with GAT and Bi-RNN shows that the preferred architecture still depends on the desired precision--recall trade-off.
