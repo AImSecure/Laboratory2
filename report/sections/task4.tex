@@ -1,6 +1,125 @@
 % task4.tex
 
-% Section Title
 \section{TASK 4: GRAPH NEURAL NETWORK (GNN)} \label{sec:task4}
 
-    % text
+The last modeling strategy represents each API call sequence as a graph. While RNNs preserve the execution trace as a temporal chain, GNNs reinterpret the same behavior as a set of API calls connected by transitions. This allows the model to reason on local neighborhoods and repeated structural patterns, rather than only on a fixed vector or on a left-to-right hidden state.
+
+\subsection{Graph Construction and Preprocessing} \label{subsec:task4_graph}
+
+Each sample is converted into a transition graph. The nodes correspond to the unique API calls appearing in the sequence, while edges connect consecutive calls with window size 1. Therefore, a transition such as $A \rightarrow B$ creates an edge from the local node representing $A$ to the local node representing $B$; loops are naturally allowed when the same API call follows itself. Node features are the global API identifiers, which are then mapped to 32-dimensional learnable embeddings inside the GNN. Unknown API calls are mapped to the \cooltext{<UNK>} index, and padding is excluded from the graph construction.
+
+This representation removes the need for padding. Unlike FFNNs and RNNs, PyTorch Geometric batches graphs by forming a larger disconnected graph and keeping a \cooltext{batch} vector that records the graph membership of each node. As a result, each sample can keep its own number of nodes and edges, and the model produces a graph-level representation through \cooltext{global\_mean\_pool}. In the first training graph, for example, only 21 unique API-call nodes and 80 transition edges are needed, even though the global vocabulary contains 260 entries.
+
+The same argument explains why test sequences are not truncated. Longer traces simply generate additional transitions and possibly additional nodes. Truncating them would remove edges from the behavioral graph and would partially defeat the reason for using a graph representation. This is a clear advantage over the FFNN setting of Task 2, where sequences longer than 90 calls had to be cut.
+
+Compared with RNNs, GNNs can aggregate information from neighborhoods and capture recurring transition motifs, such as an API call connected to several different successors or repeated cycles between calls. This can make the representation more robust to small local reorderings. However, this comes at a cost: after graph construction and global pooling, the model no longer knows exactly whether a transition occurred at the beginning or at the end of the trace. Thus, GNNs preserve structural relations between API calls, but lose part of the strict chronological information explicitly modeled by RNN hidden states.
+
+\subsection{GNN Architectures and Model Selection} \label{subsec:task4_models}
+
+We trained three graph architectures: GCN, GraphSAGE, and GAT. All models share the same basic setup: 32-dimensional embeddings, hidden dimension 64, three graph convolution/message-passing layers, global mean pooling, batch size 32, AdamW optimization, early stopping, and binary cross-entropy with logits. As in the previous neural models, the loss uses \cooltext{pos\_weight=0.20}, since malware is the positive and majority class; this down-weights malware errors and gives more relative influence to the minority benign samples.
+
+The GCN model uses three \cooltext{GCNConv} layers followed by ReLU activations and dropout $p=0.2$, then a small classifier with dropout $p=0.5$. GraphSAGE replaces the convolutional operator with three \cooltext{SAGEConv} layers, allowing node representations to be updated through neighborhood aggregation. GAT uses three attention-based layers: the first \cooltext{GATConv} uses 4 attention heads, while the following layers use a single head before the graph-level pooling. For GCN and GraphSAGE we tested learning rates $\{10^{-4}, 5\cdot10^{-4}, 10^{-3}\}$, while for GAT we tested $\{5\cdot10^{-5}, 10^{-4}, 5\cdot10^{-4}\}$.
+
+\begin{figure}[H]
+    \centering
+    \begin{subfigure}[b]{0.48\linewidth}
+        \centering
+        \includegraphics[width=\linewidth]{\imagespath Task4/task4_gcn_loss_panel.png}
+        \caption{GCN validation loss.}
+        \label{fig:task4_gcn_loss}
+    \end{subfigure}
+    \hfill
+    \begin{subfigure}[b]{0.48\linewidth}
+        \centering
+        \includegraphics[width=\linewidth]{\imagespath Task4/task4_gcn_f1_panel.png}
+        \caption{GCN macro F1.}
+        \label{fig:task4_gcn_f1}
+    \end{subfigure}
+    \vspace{-0.2cm}
+    \caption{Validation curves for GCN across learning rates.}
+    \label{fig:task4_gcn_curves}
+\end{figure}
+
+\begin{figure}[H]
+    \centering
+    \begin{subfigure}[b]{0.48\linewidth}
+        \centering
+        \includegraphics[width=\linewidth]{\imagespath Task4/task4_sage_loss_panel.png}
+        \caption{GraphSAGE validation loss.}
+        \label{fig:task4_sage_loss}
+    \end{subfigure}
+    \hfill
+    \begin{subfigure}[b]{0.48\linewidth}
+        \centering
+        \includegraphics[width=\linewidth]{\imagespath Task4/task4_sage_f1_panel.png}
+        \caption{GraphSAGE macro F1.}
+        \label{fig:task4_sage_f1}
+    \end{subfigure}
+    \vspace{-0.2cm}
+    \caption{Validation curves for GraphSAGE across learning rates.}
+    \label{fig:task4_sage_curves}
+\end{figure}
+
+\begin{figure}[H]
+    \centering
+    \begin{subfigure}[b]{0.48\linewidth}
+        \centering
+        \includegraphics[width=\linewidth]{\imagespath Task4/task4_gat_loss_panel.png}
+        \caption{GAT validation loss.}
+        \label{fig:task4_gat_loss}
+    \end{subfigure}
+    \hfill
+    \begin{subfigure}[b]{0.48\linewidth}
+        \centering
+        \includegraphics[width=\linewidth]{\imagespath Task4/task4_gat_f1_panel.png}
+        \caption{GAT macro F1.}
+        \label{fig:task4_gat_f1}
+    \end{subfigure}
+    \vspace{-0.2cm}
+    \caption{Validation curves for GAT across learning rates.}
+    \label{fig:task4_gat_curves}
+\end{figure}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.6\linewidth]{\imagespath Task4/task4_gnn_comparison_f1_macro.png}
+    \caption{Validation macro F1 comparison among the selected GNN architectures.}
+    \label{fig:task4_gnn_curves}
+\end{figure}
+
+The final configurations are selected using validation behavior, consistently with the previous tasks. For GCN, $lr=5\cdot10^{-4}$ is selected because it achieves the best validation-loss minimum among the tested configurations, with validation macro F1 0.7830 and test macro F1 0.7711. GraphSAGE also selects $lr=5\cdot10^{-4}$ under the same validation-loss criterion, reaching test macro F1 0.7633. Finally, GAT selects $lr=5\cdot10^{-4}$, obtaining validation macro F1 0.8079 and the best GNN test macro F1, 0.7903. The selected training times are approximately 179.62 seconds for GCN, 135.01 seconds for GraphSAGE, and 257.52 seconds for GAT.
+
+\subsection{Performance Analysis} \label{subsec:task4_results}
+
+Table~\ref{tab:task4_performance} provides the final comparison across all selected architectures. The GNNs clearly outperform both FFNN variants from Task 2, confirming that transition structure is much more informative than fixed positional vectors. They also improve over the frequency baseline in macro F1, although the baseline remains very competitive in accuracy because it is extremely strong on the majority malware class.
+
+\begin{table}[H]
+\small
+\centering
+\caption{Final performance comparison on the test set.}
+\label{tab:task4_performance}
+\begin{tabular}{lcccccc}
+\toprule
+\textbf{Model} & \textbf{Accuracy} & \multicolumn{2}{c}{\textbf{Benign (0)}} & \multicolumn{2}{c}{\textbf{Malware (1)}} & \textbf{Macro F1} \\
+ & & Prec. & Rec. & Prec. & Rec. & \\
+\midrule
+GCN & 95.82\% & 0.4619 & 0.7243 & 0.9891 & 0.9673 & 0.7711 \\
+GraphSAGE & 95.10\% & 0.4191 & 0.8107 & 0.9924 & 0.9564 & 0.7633 \\
+GAT & 96.31\% & 0.5042 & 0.7407 & 0.9898 & 0.9717 & 0.7903 \\
+\midrule
+Simple RNN & 95.34\% & 0.4257 & 0.7078 & 0.9884 & 0.9630 & 0.7536 \\
+Bi-RNN & 95.56\% & 0.4392 & 0.6831 & 0.9874 & 0.9661 & 0.7556 \\
+Bi-LSTM & 96.66\% & 0.5387 & 0.7449 & 0.9899 & 0.9752 & 0.8039 \\
+\midrule
+Freq. baseline & 96.97\% & 0.6885 & 0.3457 & 0.9751 & 0.9939 & 0.7223 \\
+Seq. ID FFNN & 93.01\% & 0.1074 & 0.1193 & 0.9657 & 0.9615 & 0.5383 \\
+Embed. FFNN & 91.84\% & 0.1712 & 0.3086 & 0.9723 & 0.9420 & 0.5886 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Among the GNN models, GAT is the strongest overall, suggesting that attention helps assign different importance to neighboring API-call transitions. GCN is close behind, while GraphSAGE reaches the highest benign recall, 81.07\%, at the cost of lower benign precision. All three models keep excellent malware precision and recall, above 98.9\% and 95.6\% respectively.
+
+The comparison with the baseline highlights the same trade-off already observed in Task 3. The frequency-based classifier reaches 96.97\% accuracy and 99.39\% malware recall, but only 34.57\% benign recall. GNNs sacrifice a small amount of accuracy while raising benign recall to the 72--81\% range, producing better macro F1 and a more balanced behavior.
+
+Compared with the recurrent models, the best GNN remains slightly below the Bi-LSTM in macro F1: GAT reaches 0.7903, while the Bi-LSTM reaches 0.8039. This suggests that strict temporal information is still useful, although graph models remain competitive by summarizing transition structure and clearly outperforming fixed-length FFNNs.

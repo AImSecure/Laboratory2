@@ -116,6 +116,17 @@
 % --- Page Style ---
 \pagestyle{plain}
 
+% --- Compact report layout ---
+% Keep figures readable while reducing template overhead and unused vertical gaps.
+\captionsetup{font=small,skip=3pt}
+\captionsetup[subfigure]{font=small,skip=2pt}
+\setlength{\textfloatsep}{8pt plus 1pt minus 2pt}
+\setlength{\floatsep}{6pt plus 1pt minus 2pt}
+\setlength{\intextsep}{6pt plus 1pt minus 2pt}
+\setlength{\abovecaptionskip}{3pt}
+\setlength{\belowcaptionskip}{2pt}
+\setlength{\parskip}{0pt}
+
 % --- BibTeX Command Definition ---
 % TODO: verify if this is needed for final document
 \AtBeginDocument{%
@@ -151,8 +162,8 @@
 
 % --- Section Spacing Adjustments ---
 % TODO: uncomment if custom spacing is needed
-% \titlespacing*{\section}{0pt}{2.5ex plus 1ex minus .2ex}{1.5ex plus .2ex}
-% \titlespacing*{\subsection}{0pt}{2.25ex plus 1ex minus .2ex}{1.5ex plus .2ex}
+\titlespacing*{\section}{0pt}{1.4ex plus .4ex minus .2ex}{0.8ex plus .2ex}
+\titlespacing*{\subsection}{0pt}{1.1ex plus .3ex minus .2ex}{0.6ex plus .2ex}
 
 % =============================================================================
 % DOCUMENT CONTENT
@@ -206,15 +217,13 @@
 \input{\sectionspath abstract}
 
 % --- Title Page ---
+\makeatletter
+\let\@authorsaddresses\@empty
+\makeatother
 \maketitle
 
 % Remove "Publication date: ..." from all pages after the first
 \fancyfoot[RO,LE]{}
-
-% --- Table of Contents ---
-% TODO: verify if ToC is needed for final document
-% \setcounter{tocdepth}{1}
-% \tableofcontents
 
 % --- Main Content Sections ---
 \input{\sectionspath introduction}
@@ -222,7 +231,8 @@
 \input{\sectionspath task2}
 \input{\sectionspath task3}
 \input{\sectionspath task4}
-\input{\sectionspath conclusion}
+% TODO: ask if a conclusion section is needed for final document
+%\input{\sectionspath conclusion}
 
 % --- Appendix ---
 % \clearpage
