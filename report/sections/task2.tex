@@ -1,33 +1,32 @@
 % task2.tex
 
 \section{TASK 2: FEED FORWARD NEURAL NETWORK (FFNN)} \label{sec:task2}
-   
-The Feed-Forward Neural Network (FFNN) represents the first deep learning architecture applied to the detection task, moving beyond bag-of-words counts to a positional representation of API calls. This transition introduces two primary constraints: the requirement for fixed-size input vectors and the lack of explicit temporal modeling. 
+
+The Feed-Forward Neural Network (FFNN) represents the first deep learning architecture applied to the detection task, moving beyond bag-of-words counts to a positional representation of API calls. This transition introduces two primary constraints: the requirement for fixed-size input vectors and the lack of explicit temporal modeling.
 
 \subsection{Sequence Length Variability and Fixed-Size Encoding}
 
-The API call traces exhibit significant variability in length. An analysis of the training set shows a distribution ranging from 60 to 90 calls (mean $75.03$), while the test set is shifted toward higher values, ranging from 70 to 100 calls (mean $86.33$). This mismatch is visualized in Figure~\ref{fig:seq_length_distribution}. Therefore, the test set contains sequence lengths that are never observed during training, which is particularly relevant for a fixed-input architecture.
-
+\textbf{Sequence-length variability.} The API call traces exhibit \textbf{significant variability in length}. An analysis of the training set shows a distribution ranging from 60 to 90 calls (mean $75.03$), while the test set is shifted toward higher values, ranging from 70 to 100 calls (mean $86.33$). This mismatch is visualized in Figure~\ref{fig:seq_length_distribution}. Therefore, the \textbf{test set contains sequence lengths never observed during training}, which is particularly relevant for a fixed-input architecture.
 \begin{figure}[H]
     \centering
-    \includegraphics[width=0.6\linewidth]{\imagespath Task2/distribution_sequence_lengths_train_test.png}
+    \includegraphics[width=0.50\linewidth]{\imagespath Task2/distribution_sequence_lengths_train_test.png}
     \caption{Distribution of API call sequence lengths in training and test sets.}
     \label{fig:seq_length_distribution}
 \end{figure}
 
-To accommodate the fixed input dimension of the FFNN, we established a target length of \textbf{90} based on the maximum observed in the training data. This choice ensures that no training information is lost via truncation. Sequences shorter than 90 are extended using \textbf{zero-padding}, while test sequences exceeding this limit are \textbf{truncated}.
+\textbf{Fixed-size encoding.} To accommodate the fixed input dimension of the FFNN, we established a target length of \textbf{90} based on the maximum observed in the training data. This choice ensures that no training information is lost via truncation. Sequences shorter than 90 are extended using \textbf{zero-padding}, while test sequences exceeding this limit are \textbf{truncated}.
 
-The fixed length is estimated only from the training partition, in order to avoid using information from the held-out test set to shape the preprocessing pipeline. Alternative choices such as the median length (75) or the 75th percentile (83) would reduce memory usage, but would also discard part of the training sequences. Since the maximum training length is not an extreme outlier, we choose the conservative value of 90.
+The fixed length is estimated only from the \textbf{training partition}, in order to avoid using information from the held-out test set to shape the preprocessing pipeline. Alternative choices such as the median length (75) or the 75th percentile (83) would reduce memory usage, but would also discard part of the training sequences. Since the maximum training length is not an extreme outlier, we choose the conservative value of 90.
 
 \subsection{Categorical Encoding}
 
-Before feeding sequences to the network, API names must be mapped into a numerical representation. The vocabulary is extracted from the padded training sequences, assigning index 0 to \cooltext{<PAD>} and index 1 to \cooltext{<UNK>}; the resulting vocabulary contains 260 entries, including the two special tokens. Unseen API calls in the test set are mapped to \cooltext{<UNK>}.
+\textbf{Categorical mapping.} Before feeding sequences to the network, API names must be mapped into a numerical representation. The vocabulary is extracted from the padded training sequences, assigning index 0 to \cooltext{<PAD>} and index 1 to \cooltext{<UNK>}; the resulting vocabulary contains 260 entries, including the two special tokens. Unseen API calls in the test set are mapped to \cooltext{<UNK>}.
 
 We evaluate two alternatives. In the \textbf{sequential ID} setting, each API call is represented directly by its integer identifier, producing a 90-dimensional input vector. This is simple but problematic: the model can interpret IDs as ordered numerical quantities, even though the numbering is arbitrary. In the \textbf{learnable embedding} setting, each API ID is first mapped to a trainable vector, and the 90 embedded calls are flattened before entering the dense layers. This gives the model the opportunity to learn a more meaningful representation of API calls.
 
 \subsection{Architectural Design and Hyperparameters}
 
-We implemented two variants of the FFNN to evaluate the impact of input representation:
+\textbf{Model alternatives.} We implemented two variants of the FFNN to evaluate the impact of input representation:
 
 \begin{enumerate}
     \item \textbf{Sequential IDs:} Raw integer identifiers are fed directly into a deep network with hidden dimensions of $[256, 128, 64]$. This model treats IDs as ordinal values, which is an architectural limitation.
@@ -36,53 +35,50 @@ We implemented two variants of the FFNN to evaluate the impact of input represen
 
 Both models utilize \textbf{Batch Normalization} for training stability and \textbf{Dropout} ($0.3$--$0.4$) to mitigate overfitting. Training is performed with \textbf{AdamW}, \textbf{BCEWithLogitsLoss}, batch size 64, and early stopping with patience 15 on validation loss. Since label 1 corresponds to malware and is the majority class, the loss uses \cooltext{pos\_weight=0.20} to down-weight malware errors and prevent the minority benign class from being completely overwhelmed.
 
-For the sequential-ID model, we test learning rates $\{10^{-4}, 5\cdot10^{-5}, 10^{-5}\}$ with weight decay $10^{-5}$. For the embedding model, we test $\{5\cdot10^{-5}, 10^{-5}, 5\cdot10^{-6}\}$ with weight decay $10^{-4}$. After selecting the learning rate, we also test embedding sizes $\{8,16,32,64,128\}$ to isolate the effect of representation capacity. The final configuration is selected by the minimum validation loss, while the macro F1 curves are used as a consistency check for balanced performance under class imbalance.
+\textbf{Hyperparameter selection.} For the sequential-ID model, we test learning rates $\{10^{-4}, 5\cdot10^{-5}, 10^{-5}\}$ with weight decay $10^{-5}$. For the embedding model, we test $\{5\cdot10^{-5}, 10^{-5}, 5\cdot10^{-6}\}$ with weight decay $10^{-4}$. After selecting the learning rate, we also test embedding sizes $\{8,16,32,64,128\}$ to isolate the effect of representation capacity. The final configuration is selected by the \textbf{minimum validation loss}, while the macro F1 curves are used as a consistency check for balanced performance under class imbalance.
 
-\begin{figure}[H]
+\begin{figure}[!htbp]
     \centering
-    \begin{subfigure}[b]{0.48\linewidth}
+    \begin{subfigure}[t]{0.48\linewidth}
         \centering
         \includegraphics[width=\linewidth]{\imagespath Task2/ffnn_sequential_ids_lr_comparison.png}
-        \caption{Sequential IDs.}
-        \label{fig:task2_seq_lr}
+        \caption{Sequential IDs: validation loss.}
+        \label{fig:task2_seq_loss}
     \end{subfigure}
     \hfill
-    \begin{subfigure}[b]{0.48\linewidth}
-        \centering
-        \includegraphics[width=\linewidth]{\imagespath Task2/ffnn_learnable_embeddings_lr_comparison.png}
-        \caption{Learnable embeddings.}
-        \label{fig:task2_emb_lr}
-    \end{subfigure}
-    \vspace{-0.2cm}
-    \caption{Validation loss comparison across learning rates for the two FFNN input representations.}
-    \label{fig:task2_lr_comparison}
-\end{figure}
-
-\begin{figure}[H]
-    \centering
-    \begin{subfigure}[b]{0.48\linewidth}
+    \begin{subfigure}[t]{0.48\linewidth}
         \centering
         \includegraphics[width=\linewidth]{\imagespath Task2/ffnn_sequential_ids_f1_comparison.png}
-        \caption{Sequential IDs.}
+        \caption{Sequential IDs: macro F1.}
         \label{fig:task2_seq_f1}
     \end{subfigure}
+    
+    \vspace{0.1cm}
+    \begin{subfigure}[t]{0.48\linewidth}
+        \centering
+        \includegraphics[width=\linewidth]{\imagespath Task2/ffnn_learnable_embeddings_lr_comparison.png}
+        \caption{Embeddings: validation loss.}
+        \label{fig:task2_emb_loss}
+    \end{subfigure}
     \hfill
-    \begin{subfigure}[b]{0.48\linewidth}
+    \begin{subfigure}[t]{0.48\linewidth}
         \centering
         \includegraphics[width=\linewidth]{\imagespath Task2/ffnn_learnable_embeddings_f1_comparison.png}
-        \caption{Learnable embeddings.}
+        \caption{Embeddings: macro F1.}
         \label{fig:task2_emb_f1}
     \end{subfigure}
     \vspace{-0.2cm}
-    \caption{Validation macro F1 comparison across learning rates.}
-    \label{fig:task2_f1_comparison}
+    \caption{Validation loss and macro F1 behavior of the FFNN variants across learning rates.}
+    \label{fig:task2_training_behavior}
 \end{figure}
+
+For the sequential-ID model, Figure~\ref{fig:task2_training_behavior} shows that $lr=10^{-4}$ reaches the strongest macro F1 region, while lower learning rates are slower and less competitive. For the embedding model, the loss and macro F1 curves are more informative because the network learns a continuous API representation instead of relying on raw identifiers. The selected setting uses $lr=5\cdot10^{-5}$, which gives the best validation trade-off; exact validation losses are reported in Table~\ref{tab:task2_results}.
 
 \subsection{Results and Discussion}
 
-Table~\ref{tab:task2_results} summarizes the selected models. The embedding-based FFNN obtains a lower validation loss and better validation macro F1 than the sequential-ID model, consistently with Figure~\ref{fig:task2_f1_comparison}. The sequential-ID curves are less informative because the network can exploit accidental numerical magnitudes of API identifiers; embeddings reduce this artifact by learning continuous API-call representations. On the test set, embeddings improve macro F1 from 0.5449 to 0.5842, although the benign class remains difficult because the model still receives a fixed, truncated vector rather than a temporal trace.
+\textbf{Sequential IDs versus embeddings.} Table~\ref{tab:task2_results} summarizes the selected models. The \textbf{embedding-based FFNN} obtains a lower validation loss and better validation macro F1 than the sequential-ID model. Figure~\ref{fig:task2_training_behavior} supports this qualitatively, while the exact values are taken from the logged histories and reported in the table. The sequential-ID curves are less informative because the network can exploit accidental numerical magnitudes of API identifiers; embeddings reduce this artifact by learning continuous API-call representations. On the test set, embeddings improve macro F1 from \textbf{0.5510 to 0.5726}, although the benign class remains difficult because the model still receives a fixed, truncated vector rather than a temporal trace.
 
-\begin{table}[h]
+\begin{table}[H]
 \centering
 \caption{Task 2 FFNN results for the selected configurations.}
 \label{tab:task2_results}
@@ -90,15 +86,15 @@ Table~\ref{tab:task2_results} summarizes the selected models. The embedding-base
 \toprule
 \textbf{Model} & \textbf{LR} & \textbf{Min Val Loss} & \textbf{Val Macro F1} & \textbf{Test Acc.} & \textbf{Test Macro F1} \\
 \midrule
-Sequential IDs & $10^{-4}$ & 0.0914 & 0.5490 & 0.9314 & 0.5449 \\
-Learnable Embeddings & $5\cdot10^{-5}$ & 0.0731 & 0.6590 & 0.9259 & 0.5842 \\
+Sequential IDs & $10^{-4}$ & 0.0891 & 0.5525 & 0.9368 & 0.5510 \\
+Learnable Embeddings & $5\cdot10^{-5}$ & 0.0720 & 0.6552 & 0.9090 & 0.5726 \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-The embedding-size sweep in Table~\ref{tab:task2_embedding_sizes} shows the expected trend: very small embeddings underfit the API representation, while larger embeddings improve validation macro F1. The most reliable test behavior is obtained with 64 dimensions, which gives the lowest validation loss and the best test macro F1 in the sweep. The 128-dimensional model has the highest validation macro F1, but its test macro F1 is lower, suggesting that the extra capacity does not necessarily improve generalization.
+The embedding-size sweep in Table~\ref{tab:task2_embedding_sizes} shows the expected trend: very small embeddings underfit the API representation, while larger embeddings improve validation macro F1. The most reliable validation behavior is obtained with \textbf{128 dimensions}, which gives both the lowest validation loss and the highest validation macro F1. On the test set, however, the advantage over 64 dimensions is very small, suggesting that extra representation capacity helps but does not remove the structural limitation of the FFNN.
 
-\begin{table}[h]
+\begin{table}[H]
 \small
 \centering
 \caption{Embedding-size sensitivity for the learnable-embedding FFNN.}
@@ -107,13 +103,13 @@ The embedding-size sweep in Table~\ref{tab:task2_embedding_sizes} shows the expe
 \toprule
 \textbf{Emb. dim} & \textbf{Min Val Loss} & \textbf{Val Macro F1} & \textbf{Test Macro F1} & \textbf{Test Benign Rec.} \\
 \midrule
-8 & 0.0874 & 0.5863 & 0.5675 & 0.3004 \\
-16 & 0.0777 & 0.6099 & 0.5636 & 0.3333 \\
-32 & 0.0745 & 0.6588 & 0.5761 & 0.3086 \\
-64 & 0.0722 & 0.6637 & 0.5818 & 0.2798 \\
-128 & 0.0730 & 0.6775 & 0.5633 & 0.2469 \\
+8 & 0.0825 & 0.5896 & 0.5445 & 0.3539 \\
+16 & 0.0776 & 0.6269 & 0.5692 & 0.3086 \\
+32 & 0.0790 & 0.6330 & 0.5703 & 0.3251 \\
+64 & 0.0786 & 0.6307 & 0.5845 & 0.2469 \\
+128 & 0.0697 & 0.6731 & 0.5859 & 0.2716 \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-Overall, both FFNN variants remain below the frequency-based baseline of Task 1 in macro F1. The main reason is architectural: after padding or truncation, the FFNN cannot model the temporal evolution of the API trace, and 40\% of test sequences are longer than 90 calls, so useful late-sequence behavior may be removed. This motivates the recurrent models in the next task.
+Overall, both FFNN variants remain \textbf{below the frequency-based baseline} of Task 1 in macro F1. The main reason is architectural: after padding or truncation, the FFNN cannot model the temporal evolution of the API trace, and \textbf{40\% of test sequences are longer than 90 calls}, so useful late-sequence behavior may be removed. This motivates the recurrent models in the next task.

@@ -6,109 +6,98 @@ This section investigates recurrent neural networks for malware classification f
 
 \subsection{Sequence Preprocessing} \label{subsec:task3_preprocessing}
 
-RNNs still require padding to build mini-batches, but padding is handled dynamically rather than globally. We use a custom \cooltext{collate\_fn} that sorts the samples in each batch by decreasing length, pads them only up to the longest sequence in that batch, and returns both the padded tensor and the original lengths. The embedding layer reserves index 0 for padding through \cooltext{padding\_idx=0}, and \cooltext{pack\_padded\_sequence} is used before the recurrent layer. In this way, the model does not update its hidden state on dummy positions and avoids wasting computation on padding tokens.
+\textbf{Dynamic padding.} RNNs still require padding to build mini-batches, but padding is handled \textbf{dynamically rather than globally}. We use a custom \cooltext{collate\_fn} that sorts the samples in each batch by decreasing length, pads them only up to the longest sequence in that batch, and returns both the padded tensor and the original lengths. The embedding layer reserves index 0 for padding through \cooltext{padding\_idx=0}, and \cooltext{pack\_padded\_sequence} is used before the recurrent layer. In this way, the model does not update its hidden state on dummy positions and avoids wasting computation on padding tokens.
 
-This preprocessing also removes the need for test-time truncation. A recurrent network shares the same parameters across time steps, therefore longer traces simply imply additional recurrent updates. This is an important difference with respect to Task 2, where test sequences longer than 90 API calls had to be truncated to match the FFNN input size. As a consequence, recurrent models can preserve late API calls that may contain useful behavioral information.
+\textbf{Variable-length inference.} This preprocessing also \textbf{removes the need for test-time truncation}. A recurrent network shares the same parameters across time steps, therefore longer traces simply imply additional recurrent updates. This is an important difference with respect to Task 2, where test sequences longer than 90 API calls had to be truncated to match the FFNN input size. As a consequence, recurrent models can preserve late API calls that may contain useful behavioral information.
 
-From a memory perspective, dynamic padding makes the batch tensor proportional to the longest sequence in the current batch, not to a fixed global maximum. Moreover, recurrent models keep a compact 32-dimensional embedding for each API call and process it sequentially, instead of flattening the whole embedded sequence into a large dense vector as in the embedding-based FFNN. The price is computational speed: the recurrent dependency between time steps reduces parallelization and makes training slower than FFNN training.
+From a memory perspective, dynamic padding makes the batch tensor proportional to the longest sequence in the current batch, not to a fixed global maximum. Moreover, recurrent models keep a compact 32-dimensional embedding for each API call and process it sequentially, instead of flattening the whole embedded sequence into a large dense vector as in the embedding-based FFNN. The price is computational speed: the recurrent dependency between time steps reduces parallelization and makes training \textbf{slower than FFNN training}.
 
 \subsection{RNN Architectures and Model Selection} \label{subsec:task3_architectures}
 
-We trained the three recurrent variants required by the assignment: a simple one-directional RNN, a bidirectional RNN, and a bidirectional LSTM. All models use a vocabulary built from the training set, 32-dimensional embeddings, batch size 64, AdamW optimization, binary cross-entropy with logits, early stopping, and a plateau-based learning-rate scheduler. Since label 1 corresponds to malware and is the majority class, \cooltext{pos\_weight=0.20} down-weights malware errors and helps the minority benign class influence the optimization.
+\textbf{Architecture search.} We trained three recurrent variants: a simple one-directional RNN, a bidirectional RNN, and a bidirectional LSTM. All models use a vocabulary built from the training set, 32-dimensional embeddings, batch size 64, AdamW optimization, binary cross-entropy with logits, early stopping, and a plateau-based learning-rate scheduler. Since label 1 corresponds to malware and is the majority class, \cooltext{pos\_weight=0.20} down-weights malware errors and helps the minority benign class influence the optimization. The model-specific choices are summarized in Table~\ref{tab:task3_configs}.
 
-The Simple RNN uses two unidirectional recurrent layers with hidden size 128, \cooltext{tanh} activation, and dropout $p=0.3$. The bidirectional RNN keeps the same hidden size but processes each sequence in both directions, using dropout $p=0.35$. Finally, the bidirectional LSTM replaces the vanilla recurrent units with gated memory cells and uses dropout $p=0.4$, with the goal of improving stability on longer dependencies. For the three architectures we tested, respectively, learning rates $\{2\cdot10^{-4}, 10^{-4}, 8\cdot10^{-5}, 5\cdot10^{-5}\}$, $\{3\cdot10^{-4}, 10^{-4}, 8\cdot10^{-5}, 5\cdot10^{-5}\}$, and $\{5\cdot10^{-4}, 3\cdot10^{-4}, 10^{-4}, 8\cdot10^{-5}\}$.
+\begin{table}[H]
+\scriptsize
+\centering
+\setlength{\tabcolsep}{3pt}
+\renewcommand{\arraystretch}{0.95}
+\caption{RNN architecture and learning-rate configurations.}
+\label{tab:task3_configs}
+\begin{tabular*}{\linewidth}{@{\extracolsep{\fill}}lccclccc}
+\toprule
+\textbf{Model} & \textbf{Dir.} & \textbf{Hidden} & \textbf{Dropout} & \textbf{Learning rates tested} & \textbf{Sel. LR} & \textbf{Val. loss} & \textbf{Val. Macro F1} \\
+\midrule
+Simple RNN & one-way & 128 & 0.30 & 0.0002, 0.0001, 0.00008, 0.00005 & 0.00008 & 0.0448 & 0.7442 \\
+Bi-RNN & two-way & 128 & 0.35 & 0.0003, 0.0001, 0.00008, 0.00005 & 0.00005 & 0.0329 & 0.8402 \\
+Bi-LSTM & two-way & 128 & 0.40 & 0.0005, 0.0003, 0.0001, 0.00008 & 0.0003 & 0.0275 & 0.8246 \\
+\bottomrule
+\end{tabular*}
+\end{table}
+
+The Simple RNN uses two vanilla recurrent layers with \cooltext{tanh} activation. The bidirectional RNN keeps the same cell type but processes each sequence in both directions, while the bidirectional LSTM replaces vanilla recurrent units with gated memory cells to improve stability on longer dependencies.
+
+The final configurations are selected by comparing validation loss and validation macro F1, as in Task 2.
 
 \begin{figure}[H]
     \centering
-    \begin{subfigure}[b]{0.48\linewidth}
+    \begin{subfigure}[t]{0.49\linewidth}
         \centering
         \includegraphics[width=\linewidth]{\imagespath Task3/simple_rnn_lr_comparison.png}
-        \caption{Simple RNN validation loss.}
-        \label{fig:task3_simple_loss}
+        \caption{Simple RNN.}
     \end{subfigure}
     \hfill
-    \begin{subfigure}[b]{0.48\linewidth}
-        \centering
-        \includegraphics[width=\linewidth]{\imagespath Task3/simple_rnn_f1_comparison.png}
-        \caption{Simple RNN macro F1.}
-        \label{fig:task3_simple_f1}
-    \end{subfigure}
-    \vspace{-0.2cm}
-    \caption{Validation curves for the Simple RNN across learning rates.}
-    \label{fig:task3_simple_curves}
-\end{figure}
-
-\begin{figure}[H]
-    \centering
-    \begin{subfigure}[b]{0.48\linewidth}
+    \begin{subfigure}[t]{0.49\linewidth}
         \centering
         \includegraphics[width=\linewidth]{\imagespath Task3/bidirectional_rnn_lr_comparison.png}
-        \caption{Bi-RNN validation loss.}
-        \label{fig:task3_birnn_loss}
-    \end{subfigure}
-    \hfill
-    \begin{subfigure}[b]{0.48\linewidth}
-        \centering
-        \includegraphics[width=\linewidth]{\imagespath Task3/bidirectional_rnn_f1_comparison.png}
-        \caption{Bi-RNN macro F1.}
-        \label{fig:task3_birnn_f1}
+        \caption{Bi-RNN.}
     \end{subfigure}
     \vspace{-0.2cm}
-    \caption{Validation curves for the bidirectional RNN across learning rates.}
-    \label{fig:task3_birnn_curves}
+    \caption{Validation loss curves for the vanilla recurrent architectures across learning rates.}
+    \label{fig:task3_vanilla_rnn_curves}
 \end{figure}
 
-\begin{figure}[H]
+The plots are used only as a qualitative check of convergence. In Figure~\ref{fig:task3_vanilla_rnn_curves}, the vanilla recurrent models show visibly noisy validation-loss trajectories, and the lower learning-rate runs tend to keep decreasing for longer. For the LSTM in Figure~\ref{fig:task3_lstm_curve}, $lr=0.0003$ reaches the lowest visible loss band, while $lr=0.0005$ becomes less stable after the initial decrease. The exact selection values are reported in Table~\ref{tab:task3_configs}: the Bi-RNN obtains the highest validation macro F1, while the \textbf{bidirectional LSTM has the lowest validation loss} and is then confirmed by the best test macro F1 in Table~\ref{tab:task3_performance}.
+
+\begin{figure}[!htbp]
     \centering
-    \begin{subfigure}[b]{0.48\linewidth}
-        \centering
-        \includegraphics[width=\linewidth]{\imagespath Task3/lstm_lr_comparison.png}
-        \caption{Bi-LSTM validation loss.}
-        \label{fig:task3_lstm_loss}
-    \end{subfigure}
-    \hfill
-    \begin{subfigure}[b]{0.48\linewidth}
-        \centering
-        \includegraphics[width=\linewidth]{\imagespath Task3/lstm_f1_comparison.png}
-        \caption{Bi-LSTM macro F1.}
-        \label{fig:task3_lstm_f1}
-    \end{subfigure}
+    \includegraphics[width=0.58\linewidth]{\imagespath Task3/lstm_lr_comparison.png}
     \vspace{-0.2cm}
-    \caption{Validation curves for the bidirectional LSTM across learning rates.}
-    \label{fig:task3_lstm_curves}
+    \caption{Validation loss curve for the bidirectional LSTM across learning rates.}
+    \label{fig:task3_lstm_curve}
 \end{figure}
 
-The final configurations are selected by comparing validation loss and validation macro F1, as in Task 2. The Simple RNN performs best with $lr=8\cdot10^{-5}$, reaching a minimum validation loss of 0.0547 and validation macro F1 of 0.7361. The bidirectional RNN selects $lr=5\cdot10^{-5}$, with validation loss 0.0439 and macro F1 0.7280. The bidirectional LSTM is the strongest validation model: with $lr=5\cdot10^{-4}$ it reaches the lowest validation loss, 0.0336, and the highest validation macro F1, 0.8148.
-
-RNNs are significantly slower than the FFNNs from Task 2. The selected FFNN configurations train in roughly 33--36 seconds, while the selected Simple RNN requires about 3 minutes and 52 seconds, the bidirectional RNN about 9 minutes and 36 seconds, and the bidirectional LSTM about 5 minutes. This overhead is caused by recurrent step-by-step processing, backpropagation through time, dynamic sorting and padding inside the data loader, and packed-sequence handling.
+RNNs are \textbf{significantly slower than the FFNNs} from Task 2. The selected FFNN configurations train in roughly 35--48 seconds, while the selected Simple RNN requires about 6 minutes and 52 seconds, the bidirectional RNN about 10 minutes and 6 seconds, and the bidirectional LSTM about 5 minutes and 28 seconds. This overhead is caused by recurrent step-by-step processing, backpropagation through time, dynamic sorting and padding inside the data loader, and packed-sequence handling.
 
 \subsection{Performance Analysis} \label{subsec:task3_performance}
 
-Table~\ref{tab:task3_performance} reports the test classification metrics of the selected recurrent models and compares them with the previous baselines. The Simple RNN already improves the minority-class recall substantially, increasing benign recall from 25.93\% for the selected embedding FFNN to 64.61\%. This confirms that the order of API calls contains useful information that is mostly lost by fixed-window FFNNs.
-
 \begin{table}[H]
-\small
+\footnotesize
 \centering
+\setlength{\tabcolsep}{5pt}
+\renewcommand{\arraystretch}{0.9}
 \caption{Performance comparison on the test set.}
 \label{tab:task3_performance}
 \begin{tabular}{lcccccc}
 \toprule
 \textbf{Model} & \textbf{Accuracy} & \multicolumn{2}{c}{\textbf{Benign (0)}} & \multicolumn{2}{c}{\textbf{Malware (1)}} & \textbf{Macro F1} \\
+\cmidrule(lr){3-4}\cmidrule(lr){5-6}
  & & Prec. & Rec. & Prec. & Rec. & \\
 \midrule
-Simple RNN & 94.08\% & 0.3443 & 0.6461 & 0.9858 & 0.9523 & 0.7090 \\
-Bi-RNN & 94.20\% & 0.3649 & 0.7449 & 0.9897 & 0.9497 & 0.7296 \\
-Bi-LSTM & 96.65\% & 0.5392 & 0.7078 & 0.9885 & 0.9765 & 0.7973 \\
+Simple RNN & 94.31\% & 0.3691 & 0.7366 & 0.9894 & 0.9511 & 0.7308 \\
+Bi-RNN & 96.48\% & 0.5223 & 0.6749 & 0.9872 & 0.9760 & 0.7852 \\
+Bi-LSTM & 97.16\% & 0.5967 & 0.7366 & 0.9897 & 0.9807 & 0.8222 \\
 \midrule
 Freq. baseline & 96.97\% & 0.6885 & 0.3457 & 0.9751 & 0.9939 & 0.7223 \\
-Seq. ID FFNN & 93.14\% & 0.1199 & 0.1317 & 0.9662 & 0.9625 & 0.5449 \\
-Embed. FFNN & 92.59\% & 0.1726 & 0.2593 & 0.9707 & 0.9518 & 0.5842 \\
+Seq. ID FFNN & 93.68\% & 0.1379 & 0.1317 & 0.9664 & 0.9681 & 0.5510 \\
+Embed. FFNN & 90.90\% & 0.1446 & 0.2922 & 0.9714 & 0.9329 & 0.5726 \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-The bidirectional RNN improves benign recall with respect to the Simple RNN, but this comes with lower benign precision and a much longer training time. The bidirectional LSTM is instead the best recurrent trade-off: its gates stabilize the recurrent state and help preserve relevant information over longer API traces, producing the highest macro F1 among the Task 3 models.
+\textbf{RNN performance.} Table~\ref{tab:task3_performance} compares the selected recurrent models with the previous baselines. Even the Simple RNN raises benign recall from 29.22\% for the embedding FFNN to \textbf{73.66\%}, confirming that the \textbf{order of API calls contains useful information} lost by fixed-window FFNNs.
 
-The validation curves in Figures~\ref{fig:task3_simple_curves}--\ref{fig:task3_lstm_curves} show that recurrent training is less smooth than FFNN training. Small changes in learning rate produce visible changes in convergence, and vanilla RNNs are more exposed to vanishing or unstable gradients. Rather than reading exact values from the plots, the important visual trend is that the LSTM reaches lower validation loss and a more reliable high macro F1 region than the vanilla recurrent models.
+The bidirectional RNN improves macro F1 with respect to the Simple RNN, mainly by increasing benign precision while keeping recall high. The bidirectional LSTM is the best recurrent trade-off: its gates stabilize the recurrent state and help preserve relevant information over longer API traces, producing the highest test macro F1 among the Task 3 models.
 
-The frequency baseline still obtains the highest accuracy, because it is very strong on the majority malware class. However, its benign recall is only 34.57\%, meaning that many benign samples are classified as malware. The bidirectional LSTM lowers accuracy only slightly, from 96.97\% to 96.65\%, but improves macro F1 from 0.7223 to 0.7973 and benign recall from 34.57\% to 70.78\%. In an imbalanced setting, this is a better balanced behavior: the model sacrifices a small amount of majority-class accuracy while substantially reducing the asymmetry between the two classes.
+The validation curves in Figures~\ref{fig:task3_vanilla_rnn_curves} and~\ref{fig:task3_lstm_curve} show that recurrent training is \textbf{less smooth than FFNN training}. Small changes in learning rate produce visible changes in convergence, and vanilla RNNs are more exposed to vanishing or unstable gradients. The figures are used to assess the shape of convergence, while exact F1 values come from the logged histories and from Table~\ref{tab:task3_performance}. The important visual trend is that the LSTM reaches a lower validation-loss region than the vanilla recurrent models.
+
+The frequency baseline is very strong on the majority malware class, but its benign recall is only 34.57\%, meaning that many benign samples are classified as malware. The bidirectional LSTM slightly improves accuracy, from 96.97\% to 97.16\%, and \textbf{improves macro F1 from 0.7223 to 0.8222} and benign recall from 34.57\% to 73.66\%. In an imbalanced setting, this is a better balanced behavior: the model keeps majority-class performance high while substantially reducing the asymmetry between the two classes.

@@ -115,6 +115,7 @@
 
 % --- Page Style ---
 \pagestyle{plain}
+\raggedbottom
 
 % --- Compact report layout ---
 % Keep figures readable while reducing template overhead and unused vertical gaps.
@@ -126,6 +127,13 @@
 \setlength{\abovecaptionskip}{3pt}
 \setlength{\belowcaptionskip}{2pt}
 \setlength{\parskip}{0pt}
+\renewcommand{\topfraction}{0.95}
+\renewcommand{\bottomfraction}{0.85}
+\renewcommand{\textfraction}{0.05}
+\renewcommand{\floatpagefraction}{0.8}
+\setcounter{topnumber}{3}
+\setcounter{bottomnumber}{2}
+\setcounter{totalnumber}{4}
 
 % --- BibTeX Command Definition ---
 % TODO: verify if this is needed for final document
@@ -231,7 +239,6 @@
 \input{\sectionspath task2}
 \input{\sectionspath task3}
 \input{\sectionspath task4}
-% TODO: ask if a conclusion section is needed for final document
 %\input{\sectionspath conclusion}
 
 % --- Appendix ---
