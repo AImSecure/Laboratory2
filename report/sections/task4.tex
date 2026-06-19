@@ -23,24 +23,24 @@ The GCN model uses three \cooltext{GCNConv} layers followed by ReLU activations 
 The final configurations are selected using validation behavior, consistently with the previous tasks.
 
 \begin{table}[H]
-\scriptsize
+\small
 \centering
-\setlength{\tabcolsep}{2.5pt}
-\renewcommand{\arraystretch}{0.95}
-\caption{GNN architecture, search space, and selected configurations.}
+\setlength{\tabcolsep}{5pt}
+\renewcommand{\arraystretch}{1.05}
+\caption{GNN learning-rate search and selected configurations.}
 \label{tab:task4_configs}
-\begin{tabular*}{\linewidth}{@{\extracolsep{\fill}}lccclccc}
+\begin{tabular*}{\linewidth}{@{\extracolsep{\fill}}lcccc}
 \toprule
-\textbf{Model} & \textbf{Operator} & \textbf{Heads} & \textbf{Dropout} & \textbf{Learning rates tested} & \textbf{Sel. LR} & \textbf{Val. Macro F1} & \textbf{Test Macro F1} \\
+\textbf{Model} & \textbf{Learning rates tested} & \textbf{Sel. LR} & \textbf{Val. Macro F1} & \textbf{Test Macro F1} \\
 \midrule
-GCN & GCNConv & -- & 0.2/0.5 & 0.0001, 0.0005, 0.001 & 0.001 & 0.8062 & 0.7661 \\
-GraphSAGE & SAGEConv & -- & 0.2/0.5 & 0.0001, 0.0005, 0.001 & 0.001 & 0.8604 & 0.8011 \\
-GAT & GATConv & 4/1/1 & 0.2/0.5 & 0.00005, 0.0001, 0.0005 & 0.0005 & 0.7891 & 0.7881 \\
+GCN & 0.0001, 0.0005, 0.001 & 0.001 & 0.8010 & 0.7654 \\
+GraphSAGE & 0.0001, 0.0005, 0.001 & 0.001 & 0.8236 & 0.8079 \\
+GAT & 0.00005, 0.0001, 0.0005 & 0.0005 & 0.7932 & 0.7962 \\
 \bottomrule
 \end{tabular*}
 \end{table}
 
-All models use 32-dimensional node embeddings, hidden dimension 64, batch size 32, AdamW optimization, early stopping, global mean pooling, and binary cross-entropy with logits using \texttt{pos\_weight=0.20}.
+All models use 32-dimensional node embeddings, hidden dimension 64, three message-passing layers, dropout $p=0.2$ in the graph encoder and $p=0.5$ in the classifier, batch size 32, AdamW optimization, early stopping, global mean pooling, and binary cross-entropy with logits using \texttt{pos\_weight=0.20}. GAT uses four attention heads in the first layer and one head in the following layers.
 
 \begin{figure}[H]
     \centering
@@ -77,36 +77,38 @@ For GAT, $lr=0.0005$ shows the fastest early gain, while the lower learning rate
 Table~\ref{tab:task4_performance} provides the final comparison across all selected architectures. The GNNs clearly \textbf{outperform both FFNN variants} from Task 2, confirming that transition structure is much more informative than fixed positional vectors. They also \textbf{improve over the frequency baseline in macro F1}, although the baseline remains very competitive in accuracy because it is extremely strong on the majority malware class.
 
 \begin{table}[H]
-\small
+\footnotesize
 \centering
+\setlength{\tabcolsep}{3.5pt}
+\renewcommand{\arraystretch}{0.95}
 \caption{Final performance comparison on the test set.}
 \label{tab:task4_performance}
-\begin{tabular}{lcccccc}
+\begin{tabular}{lccccccc}
 \toprule
-\textbf{Model} & \textbf{Accuracy} & \multicolumn{2}{c}{\textbf{Benign (0)}} & \multicolumn{2}{c}{\textbf{Malware (1)}} & \textbf{Macro F1} \\
-\cmidrule(lr){3-4}\cmidrule(lr){5-6}
- & & Prec. & Rec. & Prec. & Rec. & \\
+\textbf{Model} & \textbf{LR} & \textbf{Accuracy} & \multicolumn{2}{c}{\textbf{Benign (0)}} & \multicolumn{2}{c}{\textbf{Malware (1)}} & \textbf{Macro F1} \\
+\cmidrule(lr){4-5}\cmidrule(lr){6-7}
+ & & & Prec. & Rec. & Prec. & Rec. & \\
 \midrule
-GCN & 95.77\% & 0.4572 & 0.7037 & 0.9883 & 0.9676 & 0.7661 \\
-GraphSAGE & 96.82\% & 0.5600 & 0.6914 & 0.9879 & 0.9789 & 0.8011 \\
-GAT & 96.56\% & 0.5307 & 0.6749 & 0.9872 & 0.9768 & 0.7881 \\
+GCN & 1e-3 & 96.05\% & 0.4788 & 0.6502 & 0.9862 & 0.9725 & 0.7654 \\
+GraphSAGE & 1e-3 & 96.99\% & 0.5813 & 0.6914 & 0.9879 & 0.9807 & 0.8079 \\
+GAT & 5e-4 & 96.40\% & 0.5125 & 0.7572 & 0.9904 & 0.9721 & 0.7962 \\
 \midrule
-Simple RNN & 94.31\% & 0.3691 & 0.7366 & 0.9894 & 0.9511 & 0.7308 \\
-Bi-RNN & 96.48\% & 0.5223 & 0.6749 & 0.9872 & 0.9760 & 0.7852 \\
-Bi-LSTM & 97.16\% & 0.5967 & 0.7366 & 0.9897 & 0.9807 & 0.8222 \\
+Simple RNN & 2e-4 & 97.48\% & 0.6626 & 0.6626 & 0.9869 & 0.9869 & 0.8247 \\
+Bi-RNN & 1e-4 & 96.91\% & 0.5734 & 0.6749 & 0.9873 & 0.9805 & 0.8020 \\
+Bi-LSTM & 3e-4 & 97.57\% & 0.6763 & 0.6708 & 0.9872 & 0.9875 & 0.8305 \\
 \midrule
-Freq. baseline & 96.97\% & 0.6885 & 0.3457 & 0.9751 & 0.9939 & 0.7223 \\
-Seq. ID FFNN & 93.68\% & 0.1379 & 0.1317 & 0.9664 & 0.9681 & 0.5510 \\
-Embed. FFNN & 90.90\% & 0.1446 & 0.2922 & 0.9714 & 0.9329 & 0.5726 \\
+Freq. baseline & -- & 96.97\% & 0.6885 & 0.3457 & 0.9751 & 0.9939 & 0.7223 \\
+Seq. ID FFNN & 1e-4 & 93.33\% & 0.1225 & 0.1276 & 0.9661 & 0.9645 & 0.5452 \\
+Embed. FFNN & 5e-5 & 92.79\% & 0.1676 & 0.2346 & 0.9698 & 0.9548 & 0.5789 \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-\textbf{Graph-level comparison.} Among the selected GNN models, \textbf{GraphSAGE is the strongest graph architecture}: its macro F1 0.8011 is the highest among GNNs because it balances benign precision and recall better than GCN and GAT. GCN reaches the highest benign recall among graph models, but with lower benign precision; all graph models keep excellent malware precision and recall, above 98.7\% and 96.7\% respectively.
+\textbf{Graph-level comparison.} Among the selected GNN models, \textbf{GraphSAGE is the strongest graph architecture}: its macro F1 0.8079 is the highest among GNNs because it balances benign precision and recall better than GCN and GAT. GAT reaches the highest benign recall among graph models, but with lower benign precision; all graph models keep excellent malware precision and recall, around 98.6\%--99.0\% precision and above 97\% recall.
 
-Compared with the baseline, GraphSAGE slightly lowers accuracy but strongly increases macro F1, showing that transition structure improves balanced classification with only a small cost in majority-class behavior. The bidirectional LSTM remains the best model overall in this run, with macro F1 0.8222, but GraphSAGE is close and clearly stronger than the frequency and FFNN baselines. The preferred architecture still depends on the desired precision--recall trade-off: GCN recalls more benign samples, while GraphSAGE gives the best graph-level balance.
+Compared with the baseline, GraphSAGE keeps essentially the same accuracy while increasing macro F1, showing that transition structure improves balanced classification without losing majority-class behavior. The bidirectional LSTM remains the best model overall in this run, with macro F1 0.8305, but GraphSAGE is close and clearly stronger than the frequency and FFNN baselines. The preferred architecture still depends on the desired precision--recall trade-off: GAT recalls more benign samples, while GraphSAGE gives the best graph-level balance.
 
-\textbf{Architecture trade-off.} The final ranking also shows why accuracy is not sufficient for this dataset. The frequency baseline reaches 96.97\% accuracy, almost the same level as the best neural models, but its benign recall is only 34.57\%. In a malware-analysis setting this means that the model is very effective at recognizing the dominant malware class, but it tends to over-flag benign software. Sequence-aware and graph-aware models reduce this asymmetry: Bi-LSTM reaches 73.66\% benign recall, while the GNNs remain between 67.49\% and 70.37\%. Therefore, the main gain of the complex architectures is not a large increase in accuracy, but a more balanced decision boundary.
+\textbf{Architecture trade-off.} The final ranking also shows why accuracy is not sufficient for this dataset. The frequency baseline reaches 96.97\% accuracy, almost the same level as the best neural models, but its benign recall is only 34.57\%. In a malware-analysis setting this means that the model is very effective at recognizing the dominant malware class, but it tends to over-flag benign software. Sequence-aware and graph-aware models reduce this asymmetry: Bi-LSTM reaches 67.08\% benign recall, while the GNNs remain between 65.02\% and 75.72\%. Therefore, the main gain of the complex architectures is not a large increase in accuracy, but a more balanced decision boundary.
 
 \textbf{RNNs versus GNNs.} The Bi-LSTM is the strongest overall model in terms of test macro F1, suggesting that the exact temporal order of API calls is highly informative. However, GraphSAGE obtains a close macro F1 with a different inductive bias: it focuses on local transition neighborhoods and repeated API-call structures rather than on the full left-to-right execution trace. This makes the graph representation attractive when the same behavioral pattern may appear at different positions in the trace. The cost is that global chronology is compressed by graph pooling, so the model may miss patterns where the precise timing of a call is decisive.
 

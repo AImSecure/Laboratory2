@@ -35,7 +35,7 @@ We evaluate two alternatives. In the \textbf{sequential ID} setting, each API ca
 
 Both models utilize \textbf{Batch Normalization} for training stability and \textbf{Dropout} ($0.3$--$0.4$) to mitigate overfitting. Training is performed with \textbf{AdamW}, \textbf{BCEWithLogitsLoss}, batch size 64, and early stopping with patience 15 on validation loss. Since label 1 corresponds to malware and is the majority class, the loss uses \cooltext{pos\_weight=0.20} to down-weight malware errors and prevent the minority benign class from being completely overwhelmed.
 
-\textbf{Hyperparameter selection.} For the sequential-ID model, we test learning rates $\{10^{-4}, 5\cdot10^{-5}, 10^{-5}\}$ with weight decay $10^{-5}$. For the embedding model, we test $\{5\cdot10^{-5}, 10^{-5}, 5\cdot10^{-6}\}$ with weight decay $10^{-4}$. After selecting the learning rate, we also test embedding sizes $\{8,16,32,64,128\}$ to isolate the effect of representation capacity. The final configuration is selected by the \textbf{minimum validation loss}, while the macro F1 curves are used as a consistency check for balanced performance under class imbalance.
+\textbf{Hyperparameter selection.} For the neural models, the original training partition is split into 80\% training and 20\% validation using stratified sampling, preserving the class proportions. For the sequential-ID model, we test learning rates $\{10^{-4}, 5\cdot10^{-5}, 10^{-5}\}$ with weight decay $10^{-5}$. For the embedding model, we test $\{5\cdot10^{-5}, 10^{-5}, 5\cdot10^{-6}\}$ with weight decay $10^{-4}$. After selecting the learning rate, we also test embedding sizes $\{8,16,32,64,128\}$ to isolate the effect of representation capacity. The FFNN configurations are selected by the \textbf{minimum validation loss}, using macro F1 only as a qualitative class-balance check; for the later RNN and GNN models, where training is noisier and balanced behavior becomes the main objective, validation macro F1 is used as the primary selection criterion.
 
 \begin{figure}[!htbp]
     \centering
@@ -72,11 +72,11 @@ Both models utilize \textbf{Batch Normalization} for training stability and \tex
     \label{fig:task2_training_behavior}
 \end{figure}
 
-For the sequential-ID model, Figure~\ref{fig:task2_training_behavior} shows that $lr=10^{-4}$ reaches the strongest macro F1 region, while lower learning rates are slower and less competitive. For the embedding model, the loss and macro F1 curves are more informative because the network learns a continuous API representation instead of relying on raw identifiers. The selected setting uses $lr=5\cdot10^{-5}$, which gives the best validation trade-off; exact validation losses are reported in Table~\ref{tab:task2_results}.
+The plots in Figure~\ref{fig:task2_training_behavior} are used to check the overall convergence behavior rather than to read exact values. For the sequential-ID model, the validation-loss curves show a faster convergence for the larger learning rates, and $lr=10^{-4}$ is selected because it gives the lowest validation loss. The macro F1 curves are close and noisy, so the exact comparison is left to the logged metrics. For the embedding model, $lr=5\cdot10^{-5}$ reaches the best selected validation loss and a visibly stronger macro-F1 region than the slower learning rates.
 
 \subsection{Results and Discussion}
 
-\textbf{Sequential IDs versus embeddings.} Table~\ref{tab:task2_results} summarizes the selected models. The \textbf{embedding-based FFNN} obtains a lower validation loss and better validation macro F1 than the sequential-ID model. Figure~\ref{fig:task2_training_behavior} supports this qualitatively, while the exact values are taken from the logged histories and reported in the table. The sequential-ID curves are less informative because the network can exploit accidental numerical magnitudes of API identifiers; embeddings reduce this artifact by learning continuous API-call representations. On the test set, embeddings improve macro F1 from \textbf{0.5510 to 0.5726}, although the benign class remains difficult because the model still receives a fixed, truncated vector rather than a temporal trace.
+\textbf{Sequential IDs versus embeddings.} Table~\ref{tab:task2_results} summarizes the selected models. The \textbf{embedding-based FFNN} obtains a lower validation loss and better validation macro F1 than the sequential-ID model. The plotted curves are consistent with this conclusion at a high level, but the exact comparison comes from the logged histories reported in the table. The sequential-ID representation remains fragile because the network can exploit accidental numerical magnitudes of API identifiers; embeddings reduce this artifact by learning continuous API-call representations. On the test set, embeddings improve macro F1 from \textbf{0.5452 to 0.5789}, although the benign class remains difficult because the model still receives a fixed, truncated vector rather than a temporal trace.
 
 \begin{table}[H]
 \centering
@@ -86,13 +86,13 @@ For the sequential-ID model, Figure~\ref{fig:task2_training_behavior} shows that
 \toprule
 \textbf{Model} & \textbf{LR} & \textbf{Min Val Loss} & \textbf{Val Macro F1} & \textbf{Test Acc.} & \textbf{Test Macro F1} \\
 \midrule
-Sequential IDs & $10^{-4}$ & 0.0891 & 0.5525 & 0.9368 & 0.5510 \\
-Learnable Embeddings & $5\cdot10^{-5}$ & 0.0720 & 0.6552 & 0.9090 & 0.5726 \\
+Sequential IDs & $10^{-4}$ & 0.0921 & 0.5400 & 0.9333 & 0.5452 \\
+Learnable Embeddings & $5\cdot10^{-5}$ & 0.0712 & 0.6709 & 0.9279 & 0.5789 \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-The embedding-size sweep in Table~\ref{tab:task2_embedding_sizes} shows the expected trend: very small embeddings underfit the API representation, while larger embeddings improve validation macro F1. The most reliable validation behavior is obtained with \textbf{128 dimensions}, which gives both the lowest validation loss and the highest validation macro F1. On the test set, however, the advantage over 64 dimensions is very small, suggesting that extra representation capacity helps but does not remove the structural limitation of the FFNN.
+The embedding-size sweep in Table~\ref{tab:task2_embedding_sizes} shows the expected trend: very small embeddings underfit the API representation, while larger embeddings improve validation behavior. The lowest validation loss is obtained with \textbf{128 dimensions}, while the best validation and test macro F1 are obtained with \textbf{64 dimensions}. Since the differences between the larger embedding sizes are modest, the result should be interpreted as a capacity trend rather than as evidence that one exact dimensionality is universally optimal.
 
 \begin{table}[H]
 \small
@@ -103,11 +103,11 @@ The embedding-size sweep in Table~\ref{tab:task2_embedding_sizes} shows the expe
 \toprule
 \textbf{Emb. dim} & \textbf{Min Val Loss} & \textbf{Val Macro F1} & \textbf{Test Macro F1} & \textbf{Test Benign Rec.} \\
 \midrule
-8 & 0.0825 & 0.5896 & 0.5445 & 0.3539 \\
-16 & 0.0776 & 0.6269 & 0.5692 & 0.3086 \\
-32 & 0.0790 & 0.6330 & 0.5703 & 0.3251 \\
-64 & 0.0786 & 0.6307 & 0.5845 & 0.2469 \\
-128 & 0.0697 & 0.6731 & 0.5859 & 0.2716 \\
+8 & 0.0885 & 0.5847 & 0.5382 & 0.2181 \\
+16 & 0.0823 & 0.6038 & 0.5568 & 0.2510 \\
+32 & 0.0787 & 0.6368 & 0.5705 & 0.2593 \\
+64 & 0.0741 & 0.6756 & 0.5902 & 0.2510 \\
+128 & 0.0730 & 0.6440 & 0.5740 & 0.2881 \\
 \bottomrule
 \end{tabular}
 \end{table}

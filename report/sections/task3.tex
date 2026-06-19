@@ -27,16 +27,16 @@ From a memory perspective, dynamic padding makes the batch tensor proportional t
 \toprule
 \textbf{Model} & \textbf{Dir.} & \textbf{Hidden} & \textbf{Dropout} & \textbf{Learning rates tested} & \textbf{Sel. LR} & \textbf{Val. loss} & \textbf{Val. Macro F1} \\
 \midrule
-Simple RNN & one-way & 128 & 0.30 & 0.0002, 0.0001, 0.00008, 0.00005 & 0.00008 & 0.0448 & 0.7442 \\
-Bi-RNN & two-way & 128 & 0.35 & 0.0003, 0.0001, 0.00008, 0.00005 & 0.00005 & 0.0329 & 0.8402 \\
-Bi-LSTM & two-way & 128 & 0.40 & 0.0005, 0.0003, 0.0001, 0.00008 & 0.0003 & 0.0275 & 0.8246 \\
+Simple RNN & one-way & 128 & 0.30 & 0.00020, 0.00010, 0.00008, 0.00005 & 0.00020 & 0.0567 & 0.8601 \\
+Bi-RNN & two-way & 128 & 0.30 & 0.00005, 0.00008, 0.00010, 0.00015, 0.00020, 0.00030 & 0.00010 & 0.0498 & 0.8222 \\
+Bi-LSTM & two-way & 128 & 0.30 & 0.00005, 0.00008, 0.00010, 0.00015, 0.00020, 0.00030 & 0.00030 & 0.0437 & 0.8722 \\
 \bottomrule
 \end{tabular*}
 \end{table}
 
 The Simple RNN uses two vanilla recurrent layers with \cooltext{tanh} activation. The bidirectional RNN keeps the same cell type but processes each sequence in both directions, while the bidirectional LSTM replaces vanilla recurrent units with gated memory cells to improve stability on longer dependencies.
 
-The final configurations are selected by comparing validation loss and validation macro F1, as in Task 2.
+The final configurations are selected primarily by validation macro F1, with validation loss used to verify that the selected checkpoint is not the result of an unstable spike.
 
 \begin{figure}[H]
     \centering
@@ -56,7 +56,7 @@ The final configurations are selected by comparing validation loss and validatio
     \label{fig:task3_vanilla_rnn_curves}
 \end{figure}
 
-The plots are used only as a qualitative check of convergence. In Figure~\ref{fig:task3_vanilla_rnn_curves}, the vanilla recurrent models show visibly noisy validation-loss trajectories, and the lower learning-rate runs tend to keep decreasing for longer. For the LSTM in Figure~\ref{fig:task3_lstm_curve}, $lr=0.0003$ reaches the lowest visible loss band, while $lr=0.0005$ becomes less stable after the initial decrease. The exact selection values are reported in Table~\ref{tab:task3_configs}: the Bi-RNN obtains the highest validation macro F1, while the \textbf{bidirectional LSTM has the lowest validation loss} and is then confirmed by the best test macro F1 in Table~\ref{tab:task3_performance}.
+The plots are used only as a qualitative check of convergence. In Figure~\ref{fig:task3_vanilla_rnn_curves}, the vanilla recurrent models show visibly noisy validation-loss trajectories, and the lower learning-rate runs tend to keep decreasing for longer. For the LSTM in Figure~\ref{fig:task3_lstm_curve}, $lr=0.0003$ reaches the lowest visible loss band among the tested settings. The exact selection values are reported in Table~\ref{tab:task3_configs}: the \textbf{bidirectional LSTM has both the highest validation macro F1 and the lowest validation loss} among the selected recurrent configurations.
 
 \begin{figure}[!htbp]
     \centering
@@ -66,38 +66,38 @@ The plots are used only as a qualitative check of convergence. In Figure~\ref{fi
     \label{fig:task3_lstm_curve}
 \end{figure}
 
-RNNs are \textbf{significantly slower than the FFNNs} from Task 2. The selected FFNN configurations train in roughly 35--48 seconds, while the selected Simple RNN requires about 6 minutes and 52 seconds, the bidirectional RNN about 10 minutes and 6 seconds, and the bidirectional LSTM about 5 minutes and 28 seconds. This overhead is caused by recurrent step-by-step processing, backpropagation through time, dynamic sorting and padding inside the data loader, and packed-sequence handling.
+RNNs are \textbf{significantly slower than the FFNNs} from Task 2. The selected FFNN configurations train in roughly half a minute, while the selected Simple RNN requires about 5 minutes and 19 seconds, the bidirectional RNN about 8 minutes and 9 seconds, and the bidirectional LSTM about 8 minutes and 5 seconds. This overhead is caused by recurrent step-by-step processing, backpropagation through time, dynamic sorting and padding inside the data loader, and packed-sequence handling.
 
 \subsection{Performance Analysis} \label{subsec:task3_performance}
 
 \begin{table}[H]
 \footnotesize
 \centering
-\setlength{\tabcolsep}{5pt}
+\setlength{\tabcolsep}{4pt}
 \renewcommand{\arraystretch}{0.9}
 \caption{Performance comparison on the test set.}
 \label{tab:task3_performance}
-\begin{tabular}{lcccccc}
+\begin{tabular}{lccccccc}
 \toprule
-\textbf{Model} & \textbf{Accuracy} & \multicolumn{2}{c}{\textbf{Benign (0)}} & \multicolumn{2}{c}{\textbf{Malware (1)}} & \textbf{Macro F1} \\
-\cmidrule(lr){3-4}\cmidrule(lr){5-6}
- & & Prec. & Rec. & Prec. & Rec. & \\
+\textbf{Model} & \textbf{LR} & \textbf{Accuracy} & \multicolumn{2}{c}{\textbf{Benign (0)}} & \multicolumn{2}{c}{\textbf{Malware (1)}} & \textbf{Macro F1} \\
+\cmidrule(lr){4-5}\cmidrule(lr){6-7}
+ & & & Prec. & Rec. & Prec. & Rec. & \\
 \midrule
-Simple RNN & 94.31\% & 0.3691 & 0.7366 & 0.9894 & 0.9511 & 0.7308 \\
-Bi-RNN & 96.48\% & 0.5223 & 0.6749 & 0.9872 & 0.9760 & 0.7852 \\
-Bi-LSTM & 97.16\% & 0.5967 & 0.7366 & 0.9897 & 0.9807 & 0.8222 \\
+Simple RNN & 2e-4 & 97.48\% & 0.6626 & 0.6626 & 0.9869 & 0.9869 & 0.8247 \\
+Bi-RNN & 1e-4 & 96.91\% & 0.5734 & 0.6749 & 0.9873 & 0.9805 & 0.8020 \\
+Bi-LSTM & 3e-4 & 97.57\% & 0.6763 & 0.6708 & 0.9872 & 0.9875 & 0.8305 \\
 \midrule
-Freq. baseline & 96.97\% & 0.6885 & 0.3457 & 0.9751 & 0.9939 & 0.7223 \\
-Seq. ID FFNN & 93.68\% & 0.1379 & 0.1317 & 0.9664 & 0.9681 & 0.5510 \\
-Embed. FFNN & 90.90\% & 0.1446 & 0.2922 & 0.9714 & 0.9329 & 0.5726 \\
+Freq. baseline & -- & 96.97\% & 0.6885 & 0.3457 & 0.9751 & 0.9939 & 0.7223 \\
+Seq. ID FFNN & 1e-4 & 93.33\% & 0.1225 & 0.1276 & 0.9661 & 0.9645 & 0.5452 \\
+Embed. FFNN & 5e-5 & 92.79\% & 0.1676 & 0.2346 & 0.9698 & 0.9548 & 0.5789 \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-\textbf{RNN performance.} Table~\ref{tab:task3_performance} compares the selected recurrent models with the previous baselines. Even the Simple RNN raises benign recall from 29.22\% for the embedding FFNN to \textbf{73.66\%}, confirming that the \textbf{order of API calls contains useful information} lost by fixed-window FFNNs.
+\textbf{RNN performance.} Table~\ref{tab:task3_performance} compares the selected recurrent models with the previous baselines. Even the Simple RNN raises benign recall from 23.46\% for the embedding FFNN to \textbf{66.26\%}, confirming that the \textbf{order of API calls contains useful information} lost by fixed-window FFNNs.
 
-The bidirectional RNN improves macro F1 with respect to the Simple RNN, mainly by increasing benign precision while keeping recall high. The bidirectional LSTM is the best recurrent trade-off: its gates stabilize the recurrent state and help preserve relevant information over longer API traces, producing the highest test macro F1 among the Task 3 models.
+In this run, the bidirectional RNN does not improve over the Simple RNN: it keeps a similar benign recall, but loses benign precision and therefore obtains a lower macro F1. The bidirectional LSTM is the best recurrent trade-off: its gates stabilize the recurrent state and help preserve relevant information over longer API traces, producing the highest validation and test macro F1 among the Task 3 models.
 
 The validation curves in Figures~\ref{fig:task3_vanilla_rnn_curves} and~\ref{fig:task3_lstm_curve} show that recurrent training is \textbf{less smooth than FFNN training}. Small changes in learning rate produce visible changes in convergence, and vanilla RNNs are more exposed to vanishing or unstable gradients. The figures are used to assess the shape of convergence, while exact F1 values come from the logged histories and from Table~\ref{tab:task3_performance}. The important visual trend is that the LSTM reaches a lower validation-loss region than the vanilla recurrent models.
 
-The frequency baseline is very strong on the majority malware class, but its benign recall is only 34.57\%, meaning that many benign samples are classified as malware. The bidirectional LSTM slightly improves accuracy, from 96.97\% to 97.16\%, and \textbf{improves macro F1 from 0.7223 to 0.8222} and benign recall from 34.57\% to 73.66\%. In an imbalanced setting, this is a better balanced behavior: the model keeps majority-class performance high while substantially reducing the asymmetry between the two classes.
+The frequency baseline is very strong on the majority malware class, but its benign recall is only 34.57\%, meaning that many benign samples are classified as malware. The bidirectional LSTM improves accuracy from 96.97\% to 97.57\%, and \textbf{improves macro F1 from 0.7223 to 0.8305} and benign recall from 34.57\% to 67.08\%. In an imbalanced setting, this is a better balanced behavior: the model keeps majority-class performance high while substantially reducing the asymmetry between the two classes.
